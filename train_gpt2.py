@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as f
 import os
-
+import inspect
 
 class CausalSelfAttention(nn.Module):
 
@@ -109,6 +109,27 @@ class GPT(nn.module):
         logits = self.transfomer.lm_head(x) # shape of (B, T, vocab_size)
         return logits
     
+    def configure_optimizers(self, weight_decay, learning_rate, device_type):
+        param_dict = {pn: p for pn, p in self.named_parameters if p.required_gard}
+        decay_params = [p for n, p in param_dict if p.dim >=2]
+        nondecay_params = [p for n, p in param_dict if p.dim <2]
+        optim_groups = [
+            {'params': decay_params, 'weight_decay': weight_decay}
+            {'params': nondecay_params, 'weight_decay':0}
+        ]
+        num_decay_params = sum(p.numel() for p in decay_params)
+        num_nondecay_params = sum(p.numel() for p in nondecay_params)
+        if master_process:
+            print(f"num decayed parameter tensors: {len(decay_params)}, with {num_decay_params:,} parameters")
+            print(f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters")
+        # Create AdamW optimizer and use the fused version if it is available
+        fused_available = 'fused' in inspect.signature(torch.optim.AdamW).parameters
+        use_fused = fused_available and device_type == "cuda"
+        if master_process:
+            print(f"using fused AdamW: {use_fused}")
+        optimizer = torch.optim.AdamW(optim_groups, learning_rate, betas=(0.9, 0.95), eps=1e-8, fused=use_fused)
+        return optimizer
+
 
     @classmethod
     def from_pretrained(cls, model_type):
@@ -158,6 +179,7 @@ class GPT(nn.module):
                     sd[k].copy_(sd_hf[k])
 
         return model
+
 
 import tiktoken
 import numpy as np
