@@ -64,7 +64,7 @@ class Block(nn.module):
     def __init__(self, config):
         super().__init__()
         self.ln_1 = nn.LayerNorm(config.n_emb)
-        self.attn = CauselSelfAttention(config)
+        self.attn = CauselSalfAttention(config)
         self.ln_2 = nn.LayerNorm(config.n_emb)
         self.mlp = MLP(config)
     
